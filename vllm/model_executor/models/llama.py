@@ -1,4 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
 
 # Adapted from
 # https://github.com/huggingface/transformers/blob/v4.28.0/src/transformers/models/llama/modeling_llama.py
@@ -48,6 +49,7 @@ from vllm.model_executor.model_loader.weight_utils import (
 from vllm.model_executor.sampling_metadata import SamplingMetadata
 from vllm.sequence import IntermediateTensors
 
+from .adapters import as_seq_cls_model
 from .interfaces import SupportsLoRA, SupportsPP
 from .utils import (AutoWeightsLoader, PPMissingLayer, extract_layer_index,
                     is_pp_missing_parameter,
@@ -490,6 +492,9 @@ class LlamaForCausalLM(nn.Module, SupportsLoRA, SupportsPP):
         "qscale_act": "input_scale",
         "qscale_weight": "weight_scale",
         "kv_fake_quantizer.qscale_act": "kv_scale",
+        "q_fake_quantizer.qscale_act": "attn.q_scale",
+        "k_fake_quantizer.qscale_act": "k_scale",
+        "v_fake_quantizer.qscale_act": "v_scale",
         "wq": "q_proj",
         "wk": "k_proj",
         "wv": "v_proj",
@@ -641,3 +646,6 @@ class LlamaForCausalLM(nn.Module, SupportsLoRA, SupportsPP):
                 name = name.replace(item, mapping[item])
 
         return name, loaded_weight
+
+
+LlamaForSequenceClassification = as_seq_cls_model(LlamaForCausalLM)

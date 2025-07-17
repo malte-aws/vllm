@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
 
-import copy
 import math
 import os
 from collections.abc import Sequence
@@ -34,6 +34,7 @@ from vllm.model_executor.models import SupportsLoRA, supports_multimodal
 from vllm.model_executor.models.interfaces import is_pooling_model
 from vllm.model_executor.models.module_mapping import MultiModelKeys
 from vllm.model_executor.models.utils import PPMissingLayer, WeightsMapper
+from vllm.model_executor.utils import get_packed_modules_mapping
 from vllm.utils import is_pin_memory_available
 
 logger = init_logger(__name__)
@@ -200,7 +201,7 @@ class LoRAModel(AdapterModel):
             weights_mapper: Optional[WeightsMapper] = None,
             tensorizer_config_dict: Optional[dict] = None) -> "LoRAModel":
         """Create a LoRAModel from a local checkpoint.
-        
+
         Args:
             lora_dir: The local path that has lora data.
             expected_lora_modules: Name of modules that are expected to be
@@ -244,9 +245,10 @@ class LoRAModel(AdapterModel):
             lora_tensor_path = os.path.join(tensorizer_config.tensorizer_dir,
                                             "adapter_model.tensors")
             tensorizer_args = tensorizer_config._construct_tensorizer_args()
-            tensors = TensorDeserializer(lora_tensor_path,
-                                         dtype=tensorizer_config.dtype,
-                                         **tensorizer_args.deserializer_params)
+            tensors = TensorDeserializer(
+                lora_tensor_path,
+                dtype=tensorizer_config.dtype,
+                **tensorizer_args.deserialization_kwargs)
             check_unexpected_modules(tensors)
 
         elif os.path.isfile(lora_tensor_path):
@@ -364,8 +366,8 @@ class LoRAModelManager(AdapterModelManager):
             # We need to replace rotary emb layer to do batch computation
             # for long lora.
             self.supported_lora_modules.append("rotary_emb")
-        self.packed_modules_mapping = copy.deepcopy(
-            self.model.packed_modules_mapping)
+
+        self.packed_modules_mapping = get_packed_modules_mapping(self.model)
         # Used to indicate whether the model is a multimodal model
         self.supports_mm: bool = (
             supports_multimodal(self.model)
@@ -620,7 +622,7 @@ class LoRAModelManager(AdapterModelManager):
     def _filter_unsupported_mm_module(self, module_name: str) -> bool:
         """
         Regarding multimodal models, vLLM currently only supports adding LoRA to
-        language model. LoRA for other modules, such as the vision tower, will 
+        language model. LoRA for other modules, such as the vision tower, will
         be filtered out.
         """
         if self.supports_mm:
@@ -804,7 +806,7 @@ def create_lora_manager(
         lora_manager_cls: type[LoRAModelManager] = LoRAModelManager,
         **kwargs) -> LoRAModelManager:
     """Create a LoRA adapter for a given model."""
-    if not hasattr(model, "packed_modules_mapping"):
+    if not isinstance(model, SupportsLoRA):
         raise ValueError(f"Model {type(model)} is not supported for LoRA.")
     lora_manager = lora_manager_cls(
         model=model,

@@ -1,4 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
 """Inference-only GraniteMoeShared model.
 
 The architecture is the same as granitemoe but with the addition of shared
@@ -26,8 +27,7 @@ from vllm.model_executor.layers.vocab_parallel_embedding import (
 from vllm.model_executor.sampling_metadata import SamplingMetadata
 from vllm.sequence import IntermediateTensors
 
-from . import mixtral
-from .granitemoe import GraniteMoeAttention, GraniteMoeMoE
+from .granitemoe import GraniteMoeAttention, GraniteMoeModel, GraniteMoeMoE
 from .interfaces import SupportsLoRA, SupportsPP
 from .utils import AutoWeightsLoader, make_layers, maybe_prefix
 
@@ -241,7 +241,7 @@ class GraniteMoeSharedModel(nn.Module):
                 new_weights[gate_name] = p
             else:
                 new_weights[n] = p
-        return mixtral.MixtralModel.load_weights(self, new_weights.items())
+        return GraniteMoeModel._load_weights(self, new_weights.items())
 
 
 class GraniteMoeSharedForCausalLM(nn.Module, SupportsLoRA, SupportsPP):

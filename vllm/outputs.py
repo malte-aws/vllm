@@ -1,4 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
 
 import time
 from collections.abc import MutableSequence
@@ -7,7 +8,7 @@ from dataclasses import dataclass
 from typing import Any, Generic, Optional, Union
 
 import torch
-from typing_extensions import TypeVar, deprecated
+from typing_extensions import TypeVar
 
 from vllm.logger import init_logger
 from vllm.lora.request import LoRARequest
@@ -75,14 +76,6 @@ class PoolingOutput:
     def __eq__(self, other: object) -> bool:
         return (isinstance(other, self.__class__) and bool(
             (self.data == other.data).all()))
-
-    @property
-    @deprecated("`LLM.encode()` now stores raw outputs in the `data` "
-                "attribute. To return embeddings, use `LLM.embed()`. "
-                "To return class probabilities, use `LLM.classify()` "
-                "and access the `probs` attribute. ")
-    def embedding(self) -> list[float]:
-        return self.data.tolist()
 
 
 class RequestOutput:
@@ -460,6 +453,7 @@ class ClassificationOutput:
 
     @staticmethod
     def from_base(pooling_output: PoolingOutput):
+        # pooling_output shape: (num_classes)
         pooled_data = pooling_output.data
         if pooled_data.ndim != 1:
             raise ValueError("pooled_data should be a 1-D probability vector")
@@ -497,7 +491,10 @@ class ScoringOutput:
 
     @staticmethod
     def from_base(pooling_output: PoolingOutput):
-        pooled_data = pooling_output.data
+        # pooling_output shape:
+        #   classify task: (num_classes) num_classes == 1
+        #   embed task: a scalar value
+        pooled_data = pooling_output.data.squeeze()
         if pooled_data.ndim != 0:
             raise ValueError("pooled_data should be a scalar score")
 
@@ -505,12 +502,6 @@ class ScoringOutput:
 
     def __repr__(self) -> str:
         return f"ScoringOutput(score={self.score})"
-
-    @property
-    @deprecated("`LLM.score()` now returns scalar scores. "
-                "Please access it via the `score` attribute. ")
-    def embedding(self) -> list[float]:
-        return [self.score]
 
 
 class ScoringRequestOutput(PoolingRequestOutput[ScoringOutput]):
